@@ -11,7 +11,7 @@
 //PINOUT
 //dont use 1 2 and serial!!
 
-const int GasHahn = 21;
+const int GasHahn = 18;
 const int ZuendPin = 23;
 const int PumpenSoftwarePWM = 26;
 
@@ -35,7 +35,7 @@ unsigned long ZuendZeitpunkt = 0; //0: Kein Zündvorgang
 volatile unsigned long UrinSensorHeartbeat = 0;
 
 int TempIst = 0;
-const int MaxZuendZeit = 10000;
+const unsigned long MaxZuendZeit = 10000;
 
 //Die ideale Tempereratur liegt zwischen TempMin und TempMax
 //Bei TempError wird die Maschine wegen Überhitzung gestoppt
@@ -62,15 +62,6 @@ String Line2 = "Starting";
 MAX6675 Flammdetektor(BurningCheckCLK, BurningCheckCS, BurningCheckDO);
 Adafruit_MAX31865 TemperaturSensor = Adafruit_MAX31865(TempSpiCS, TempSpiDI, BurningCheckDO, BurningCheckCLK);
 
-void Display()
-{
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print(Line1);
-  lcd.setCursor(0, 1);
-  lcd.print(Line2);
-}
-
 void InteruptUrinSensor()
 {
   UrinSensorHeartbeat = millis();
@@ -88,6 +79,23 @@ bool BinIchDran(unsigned long waitTime, unsigned long *p_oldTime)
 
   return false;
 }
+
+void Display()
+{
+
+  const unsigned long waitTime = 500; // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
+  static unsigned long oldTime = 0;
+
+  if (!BinIchDran(waitTime, &oldTime)) //if time too short return last return
+    return;
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(Line1);
+  lcd.setCursor(0, 1);
+  lcd.print(Line2);
+}
+
 
 inline boolean IsBurning()
 {
@@ -118,6 +126,9 @@ void GasHahnSchalten(bool auf)
 
 void Zuenden()
 {
+  if(ZuendZeitpunkt > 0)
+    return;
+
   DEBUG_PRINTLN("Zuenden.");
   GasHahnSchalten(true);
   DEBUG_PRINTLN("Gashahn ist offen");
@@ -145,7 +156,7 @@ void Zuendkontrolle()
     return;
   }
 
-  if (millis() - ZuendZeitpunkt < MaxZuendZeit)
+  if ((millis() - ZuendZeitpunkt) < MaxZuendZeit)
     return;
 
   DEBUG_PRINTLN("Zuenden erfolglos");
@@ -229,6 +240,12 @@ void UrinSoftwarePWM()
 
 void UrinRunningCheck()
 {
+
+
+return;
+
+
+
   static unsigned long oldTime = 0;
   const unsigned long waitTime = 1000;
 
@@ -254,7 +271,7 @@ void ReadTemp()
   {
     const float RREF = 4300.0; //pt100 <-> pt 1000
     TempIst = (int)TemperaturSensor.temperature(1000, RREF); //1000 == Ohm bei 0Grad
-    WriteFault(TemperaturSensor);
+    //WriteFault(TemperaturSensor);  //fuehrt derzeit zu reboot?????
 
     DEBUG_PRINTLN_VALUE("TEMP Ist: ", TempIst);
   }
