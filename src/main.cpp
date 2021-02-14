@@ -1,6 +1,3 @@
-//ANZEIGEN HEATING ETC
-//Github
-
 #include <Arduino.h>
 
 #include <Wire.h> //wire = 2Wire = i2c!
