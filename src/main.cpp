@@ -176,9 +176,9 @@ void ErrorAction()
 }
 
 #ifdef _SMARTDEBUG
-void WriteFault(Adafruit_MAX31865 max)
+void WriteFault()
 {
-  uint8_t fault = max.readFault();
+  uint8_t fault = TemperaturSensor.readFault();
   if (fault)
   {
     DEBUG_PRINTLN_VALUE("Adafruit_MAX31865 Fault ", fault);
@@ -207,7 +207,7 @@ void WriteFault(Adafruit_MAX31865 max)
     {
       DEBUG_PRINTLN("Under/Over voltage");
     }
-    max.clearFault();
+    TemperaturSensor.clearFault();
   }
 }
 #else
@@ -271,7 +271,7 @@ void ReadTemp()
   {
     const float RREF = 4300.0; //pt100 <-> pt 1000
     TempIst = (int)TemperaturSensor.temperature(1000, RREF); //1000 == Ohm bei 0Grad
-    //WriteFault(TemperaturSensor);  //fuehrt derzeit zu reboot?????
+    WriteFault(); 
 
     DEBUG_PRINTLN_VALUE("TEMP Ist: ", TempIst);
   }
