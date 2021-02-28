@@ -26,7 +26,7 @@ int BurningCheckCS = 5;
 int BurningCheckCLK = 33;
 
 //PININ
-const int UrinSensorInteruptPin = 16;
+const int UrinSensorInteruptPin = 27;
 const int TempSensor = 33;
 const int AnalogPlus = 34;  //Pulldown 10K
 const int AnalogMinus = 35; //Pulldown 10K
@@ -69,6 +69,9 @@ void InteruptUrinSensor()
 
 bool BinIchDran(unsigned long waitTime, unsigned long *p_oldTime)
 {
+  if(ErrorState != 0)
+    return false;
+
   unsigned long millisecs = millis();
 
   if (*p_oldTime + waitTime < millisecs)
@@ -82,12 +85,17 @@ bool BinIchDran(unsigned long waitTime, unsigned long *p_oldTime)
 
 void Display()
 {
-
   const unsigned long waitTime = 500; // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
   static unsigned long oldTime = 0;
 
   if (!BinIchDran(waitTime, &oldTime)) //if time too short return last return
     return;
+
+  static String lastDisplay = "";   //Display is so slow it slows down SW PWM Pumpe!
+  if(lastDisplay.compareTo(Line1 + Line2) == 0)
+    return;
+  
+  lastDisplay = Line1 + Line2;
 
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -108,7 +116,7 @@ inline boolean IsBurning()
     return result;
 
   int temp = (int)Flammdetektor.readCelsius();
-  DEBUG_PRINTLN_VALUE("Flammdetektor: ", temp);
+  //DEBUG_PRINTLN_VALUE("Flammdetektor: ", temp);
 
   if (temp > 100)
     result = true;
@@ -222,7 +230,7 @@ void UrinSoftwarePWM()
     return;
 
   static unsigned long oldTime = 0;
-  int UrinPumpFrequenz = 2 * UrinPumpStufe;
+  int UrinPumpFrequenz = 5 * UrinPumpStufe;
 
   if (BinIchDran(1000 / UrinPumpFrequenz, &oldTime))
   {
@@ -240,12 +248,6 @@ void UrinSoftwarePWM()
 
 void UrinRunningCheck()
 {
-
-
-return;
-
-
-
   static unsigned long oldTime = 0;
   const unsigned long waitTime = 1000;
 
@@ -264,36 +266,36 @@ return;
 
 void ReadTemp()
 {
-  const unsigned long waitTime = 500;
+  const unsigned long waitTime = 950;
   static unsigned long oldTime = 0;
 
   if (BinIchDran(waitTime, &oldTime))
   {
     const float RREF = 4300.0; //pt100 <-> pt 1000
     TempIst = (int)TemperaturSensor.temperature(1000, RREF); //1000 == Ohm bei 0Grad
-    WriteFault(); 
+    //WriteFault(); 
 
-    DEBUG_PRINTLN_VALUE("TEMP Ist: ", TempIst);
+    //DEBUG_PRINTLN_VALUE("TEMP Ist: ", TempIst);
   }
 }
 
 void ShowHeatStatus()
 {
-  const unsigned long waitTime = 500;
+  const unsigned long waitTime = 960;
   static unsigned long oldTime = 0;
 
   if (BinIchDran(waitTime, &oldTime))
   {
     if ((TempIst >= TempMin))
-      Line2 = "hot";
+      Line2 = "hot " + String((TempIst / 3) * 3); //nur in 3 Grad Schritten da Display PWM verlangsamt
     else
-      Line2 = "cold";
+      Line2 = "cold " + String((TempIst / 3) * 3);
   }
 }
 
 void TemperaturSteuerung()
 {
-  const unsigned long waitTime = 500;
+  const unsigned long waitTime = 970;
   static unsigned long oldTime = 0;
 
   if (BinIchDran(waitTime, &oldTime))
@@ -320,7 +322,7 @@ void TemperaturSteuerung()
 
 void GasKontrolle()
 {
-  const unsigned long waitTime = 500;
+  const unsigned long waitTime = 510;
   static unsigned long oldTime = 0;
 
   if (!BinIchDran(waitTime, &oldTime))
@@ -358,7 +360,7 @@ void CheckPlusAnalogMinus()
     sprintf(str, "Fluidlevel  %d", UrinPumpStufe);
     Line1 = str;
 
-    DEBUG_PRINTLN_VALUE("URIN - PumpStufe: ", UrinPumpStufe);
+    //DEBUG_PRINTLN_VALUE("URIN - PumpStufe: ", UrinPumpStufe);
   }
 }
 
