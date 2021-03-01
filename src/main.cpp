@@ -140,7 +140,7 @@ void Zuenden()
     return;
 
   DEBUG_PRINTLN("Zuenden.");
-  GasHahnSchalten(150 / 255);
+  GasHahnSchalten(195);
   DEBUG_PRINTLN("Gashahn ist offen");
 
   digitalWrite(ZuendPin, 1);
@@ -278,7 +278,7 @@ void ReadTemp()
     TempIst = (int)TemperaturSensor.temperature(1000, RREF); //1000 == Ohm bei 0Grad
     //WriteFault(); 
 
-    //DEBUG_PRINTLN_VALUE("TEMP Ist: ", TempIst);
+    DEBUG_PRINTLN_VALUE("TEMP Ist: ", TempIst);
   }
 }
 
@@ -379,11 +379,11 @@ void setup()
   pinMode(PumpenSoftwarePWM, OUTPUT);
   //pinMode(GasHahn, OUTPUT);
   
+  ledcSetup(GasHahnChannel, 5000, 8); // 12 kHz PWM, 8-bit resolution
   ledcAttachPin(GasHahn, GasHahnChannel);  
-  ledcSetup(GasHahnChannel, 12000, 8); // 12 kHz PWM, 8-bit resolution
 
   pinMode(ZuendPin, OUTPUT);
-  digitalWrite(GasHahn, 0);
+  ledcWrite(GasHahnChannel, 0);
 
   pinMode(UrinSensorInteruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(UrinSensorInteruptPin), InteruptUrinSensor, FALLING);
