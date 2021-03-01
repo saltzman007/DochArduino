@@ -12,9 +12,8 @@
 //dont use 1 2 and serial!!
 
 const int GasHahn = 18;
-const int GasHahnChannel = 1;
 const int ZuendPin = 23;
-const int PumpenSoftwarePWM = 26;
+const int PumpenPWM = 26;
 
 const int TempSpiCS = 4;
 const int TempSpiDI = 13;
@@ -38,6 +37,10 @@ volatile unsigned long UrinSensorHeartbeat = 0;
 int TempIst = 0;
 const unsigned long MaxZuendZeit = 10000;
 
+const int GasHahnChannel = 1;
+const int PumpenChannel = 2;
+
+
 //Die ideale Tempereratur liegt zwischen TempMin und TempMax
 //Bei TempError wird die Maschine wegen Überhitzung gestoppt
 
@@ -46,9 +49,9 @@ const unsigned long MaxZuendZeit = 10000;
 //Ab TempMin kann genebelt werden
 
 int TempMin = 240;
-int TempIdeal = 260;
+int TempIdeal = 270;
 int TempMax = 280;
-const int TempError = 300;
+const int TempError = 310;
 
 int UrinPumpStufe = 0;
 const int UrinPumpStufeMax = 10;
@@ -118,7 +121,7 @@ inline boolean IsBurning()
     return result;
 
   int temp = (int)Flammdetektor.readCelsius();
-  //DEBUG_PRINTLN_VALUE("Flammdetektor: ", temp);
+  DEBUG_PRINTLN_VALUE("Flammdetektor: ", temp);
 
   if (temp > 100)
     result = true;
@@ -145,7 +148,7 @@ void Zuenden()
   }
   else
   {
-    proportionalVentilStellung = 180;
+    proportionalVentilStellung = 220;
     digitalWrite(ZuendPin, 1);
     ZuendZeitpunkt = millis();
     DEBUG_PRINTLN("Zuenden.");
@@ -183,6 +186,13 @@ void Zuendkontrolle()
   Line2 = "no ignition";
 }
 
+void PumpeAus()
+{
+      ledcSetup(PumpenChannel, 1000, 8);  //8 Bit = 255
+      ledcAttachPin(PumpenPWM, PumpenChannel);   
+      ledcWrite(PumpenChannel, 0);
+}
+
 void ErrorAction()
 {
   Line1 = "Error";
@@ -191,6 +201,8 @@ void ErrorAction()
   GasHahnSchalten(0);
   digitalWrite(ZuendPin, 0);
   UrinPumpStufe = 0;
+
+  PumpeAus();
 }
 
 #ifdef _SMARTDEBUG
@@ -234,25 +246,37 @@ void WriteFault(Adafruit_MAX31865 max)
 }
 #endif
 
-void UrinSoftwarePWM()
+void UrinPWM()
 {
-  if(UrinPumpStufe == 0)
-    return;
-
   static unsigned long oldTime = 0;
-  int UrinPumpFrequenz = 5 * UrinPumpStufe;
+  const unsigned long waitTime = 500;
 
-  if (BinIchDran(1000 / UrinPumpFrequenz, &oldTime))
+  if (BinIchDran(waitTime, &oldTime))
   {
     if (TempIst < TempMin)
-    {
       UrinPumpStufe = 0;
+
+    if(UrinPumpStufe == 0)
+    {
+      PumpeAus();
       return;
     }
 
-    digitalWrite(PumpenSoftwarePWM, 1);
-    delay(10);
-    digitalWrite(PumpenSoftwarePWM, 0);
+    static int lastValue = 0;
+    if(lastValue == UrinPumpStufe)
+      return;
+    
+    lastValue = UrinPumpStufe;
+
+    const int pwmResolution = 8;
+    //PumpStufeMax = 50 Hz
+    int frequenz =  (50 * UrinPumpStufe) / UrinPumpStufeMax;
+    ledcSetup(PumpenChannel, frequenz, pwmResolution);  //8 Bit = 255
+    ledcAttachPin(PumpenPWM, PumpenChannel);    //Bei der Frequenz will ich 10ms Impuls
+    //Phasendauer = 1000ms / Herz, eg 30ms: Dann will ich 10ms Impuls von 30ms = 0,33 von Resolution = 255
+
+    //ledcWrite(PumpenChannel, 10 * 255 / (1000 / frequenz)); //too big, circa 2,5 * frequenz
+    ledcWrite(PumpenChannel, (2 * frequenz) + (frequenz / 2));
   }
 }
 
@@ -367,7 +391,7 @@ void CheckPlusAnalogMinus()
       --UrinPumpStufe;
 
     char str[17];
-    sprintf(str, "Fluidlevel  %d %", ((UrinPumpStufe *100) / UrinPumpStufeMax));
+    sprintf(str, "Fluidlevel %d %%", ((UrinPumpStufe *100) / UrinPumpStufeMax));
     Line1 = str;
 
     //DEBUG_PRINTLN_VALUE("URIN - PumpStufe: ", UrinPumpStufe);
@@ -383,7 +407,7 @@ void setup()
 
   pinMode(AnalogPlus, INPUT);
   pinMode(AnalogMinus, INPUT);
-  pinMode(PumpenSoftwarePWM, OUTPUT);
+  //pinMode(PumpenSoftwarePWM, OUTPUT);
   //pinMode(GasHahn, OUTPUT);
   
   ledcSetup(GasHahnChannel, 5000, 8); // 12 kHz PWM, 8-bit resolution
@@ -406,7 +430,7 @@ void loop()
   if (ErrorState == 0)
   {
     ReadTemp();
-    UrinSoftwarePWM();
+    UrinPWM();
     UrinRunningCheck();
     ShowHeatStatus();
     TemperaturSteuerung();
