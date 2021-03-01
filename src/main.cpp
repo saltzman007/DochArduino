@@ -136,17 +136,24 @@ void GasHahnSchalten(int value)
 
 void Zuenden()
 {
-  if(ZuendZeitpunkt > 0)
-    return;
+  static int proportionalVentilStellung;
 
-  DEBUG_PRINTLN("Zuenden.");
-  GasHahnSchalten(195);
-  DEBUG_PRINTLN("Gashahn ist offen");
+  if(ZuendZeitpunkt > 0)  //Ist schon am Zünden
+  {
+      if(proportionalVentilStellung < 250)
+        proportionalVentilStellung += 3;
+  }
+  else
+  {
+    proportionalVentilStellung = 180;
+    digitalWrite(ZuendPin, 1);
+    ZuendZeitpunkt = millis();
+    DEBUG_PRINTLN("Zuenden.");
+  }
 
-  digitalWrite(ZuendPin, 1);
-  ZuendZeitpunkt = millis();
+  GasHahnSchalten(proportionalVentilStellung);
+  DEBUG_PRINTLN_VALUE("Gashahn ist offen", proportionalVentilStellung);
 }
-
 void Zuendkontrolle()
 {
   const unsigned long waitTime = 500;
