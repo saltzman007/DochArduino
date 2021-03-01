@@ -12,9 +12,8 @@
 //dont use 1 2 and serial!!
 
 const int GasHahn = 18;
-const int GasHahnChannel = 1;
 const int ZuendPin = 23;
-const int PumpenSoftwarePWM = 26;
+const int PumpenPWM = 26;
 
 const int TempSpiCS = 4;
 const int TempSpiDI = 13;
@@ -37,6 +36,9 @@ volatile unsigned long UrinSensorHeartbeat = 0;
 
 int TempIst = 0;
 const unsigned long MaxZuendZeit = 10000;
+
+const int GasHahnChannel = 1;
+const int PumpenChannel = 1;
 
 //Die ideale Tempereratur liegt zwischen TempMin und TempMax
 //Bei TempError wird die Maschine wegen Überhitzung gestoppt
@@ -227,25 +229,37 @@ void WriteFault(Adafruit_MAX31865 max)
 }
 #endif
 
-void UrinSoftwarePWM()
+void UrinPWM()
 {
-  if(UrinPumpStufe == 0)
-    return;
-
   static unsigned long oldTime = 0;
-  int UrinPumpFrequenz = 5 * UrinPumpStufe;
+  const unsigned long waitTime = 500;
 
-  if (BinIchDran(1000 / UrinPumpFrequenz, &oldTime))
+  if (BinIchDran(waitTime, &oldTime))
   {
     if (TempIst < TempMin)
-    {
       UrinPumpStufe = 0;
+
+    if(UrinPumpStufe == 0)
+    {
+      ledcWrite(PumpenChannel, 0);
       return;
     }
 
-    digitalWrite(PumpenSoftwarePWM, 1);
-    delay(10);
-    digitalWrite(PumpenSoftwarePWM, 0);
+    static int lastValue = 0;
+    if(lastValue == UrinPumpStufe)
+      return;
+    
+    lastValue = UrinPumpStufe;
+
+    const int pwmResolution = 8;
+    //PumpStufeMax = 50 Hz
+    int frequenz =  (50 * UrinPumpStufe) / UrinPumpStufeMax;
+    ledcSetup(PumpenChannel, frequenz, pwmResolution);  //8 Bit = 255
+    //Bei der Frequenz will ich 10ms Impuls
+    //Phasendauer = 1000ms / Herz, eg 30ms: Dann will ich 10ms Impuls von 30ms = 0,33 von Resolution = 255
+
+    //ledcWrite(PumpenChannel, 10 * 255 / (1000 / frequenz)); //too big, circa 2,5 * frequenz
+    ledcWrite(PumpenChannel, (2 * frequenz) + (frequenz / 2));
   }
 }
 
@@ -376,11 +390,13 @@ void setup()
 
   pinMode(AnalogPlus, INPUT);
   pinMode(AnalogMinus, INPUT);
-  pinMode(PumpenSoftwarePWM, OUTPUT);
+  //pinMode(PumpenSoftwarePWM, OUTPUT);
   //pinMode(GasHahn, OUTPUT);
   
   ledcAttachPin(GasHahn, GasHahnChannel);  
+  ledcAttachPin(PumpenPWM, PumpenChannel);  
   ledcSetup(GasHahnChannel, 12000, 8); // 12 kHz PWM, 8-bit resolution
+  ledcSetup(PumpenChannel, 12000, 8); // Just a default!
 
   pinMode(ZuendPin, OUTPUT);
   digitalWrite(GasHahn, 0);
@@ -399,7 +415,7 @@ void loop()
   if (ErrorState == 0)
   {
     ReadTemp();
-    UrinSoftwarePWM();
+    UrinPWM();
     UrinRunningCheck();
     ShowHeatStatus();
     TemperaturSteuerung();
