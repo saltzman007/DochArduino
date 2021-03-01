@@ -12,6 +12,7 @@
 //dont use 1 2 and serial!!
 
 const int GasHahn = 18;
+const int GasHahnChannel = 1;
 const int ZuendPin = 23;
 const int PumpenSoftwarePWM = 26;
 
@@ -50,7 +51,8 @@ int TempMax = 280;
 const int TempError = 300;
 
 int UrinPumpStufe = 0;
-const int GasMengeMin = 600;
+const int UrinPumpStufeMax = 10;
+//const int GasMengeMin = 600;
 bool GasHahnAuf = false;
 
 int ErrorState = 0; //1: UrinLow; 2: GasLow; 4: Zuenden erfolglos
@@ -126,10 +128,10 @@ inline boolean IsBurning()
   return result;
 }
 
-void GasHahnSchalten(bool auf)
+void GasHahnSchalten(int value)
 {
-  digitalWrite(GasHahn, auf);
-  GasHahnAuf = auf;
+  ledcWrite(GasHahnChannel, value);  //this is an analogWrite
+  GasHahnAuf = (value != 0);
 }
 
 void Zuenden()
@@ -138,7 +140,7 @@ void Zuenden()
     return;
 
   DEBUG_PRINTLN("Zuenden.");
-  GasHahnSchalten(true);
+  GasHahnSchalten(150 / 255);
   DEBUG_PRINTLN("Gashahn ist offen");
 
   digitalWrite(ZuendPin, 1);
@@ -160,6 +162,7 @@ void Zuendkontrolle()
   {
     DEBUG_PRINTLN("Burning ");
     digitalWrite(ZuendPin, 0);
+    GasHahnSchalten(255);
     ZuendZeitpunkt = 0;
     return;
   }
@@ -178,7 +181,7 @@ void ErrorAction()
   Line1 = "Error";
   DEBUG_PRINTLN_VALUE("Errorstate: ", ErrorState);
 
-  GasHahnSchalten(false);
+  GasHahnSchalten(0);
   digitalWrite(ZuendPin, 0);
   UrinPumpStufe = 0;
 }
@@ -315,7 +318,7 @@ void TemperaturSteuerung()
 
     if (TempIst > TempMax)
     {
-      GasHahnSchalten(false);
+      GasHahnSchalten(0);
     }
   }
 }
@@ -347,7 +350,7 @@ void CheckPlusAnalogMinus()
   if (BinIchDran(waitTime, &oldTime))
   {
 
-    if (digitalRead(AnalogPlus) & (UrinPumpStufe < 9) & (TempIst >= TempMin))
+    if (digitalRead(AnalogPlus) & (UrinPumpStufe < UrinPumpStufeMax) & (TempIst >= TempMin))
     {
       ++UrinPumpStufe;
       UrinSensorHeartbeat = millis();
@@ -357,7 +360,7 @@ void CheckPlusAnalogMinus()
       --UrinPumpStufe;
 
     char str[17];
-    sprintf(str, "Fluidlevel  %d", UrinPumpStufe);
+    sprintf(str, "Fluidlevel  %d %", ((UrinPumpStufe *100) / UrinPumpStufeMax));
     Line1 = str;
 
     //DEBUG_PRINTLN_VALUE("URIN - PumpStufe: ", UrinPumpStufe);
@@ -374,7 +377,11 @@ void setup()
   pinMode(AnalogPlus, INPUT);
   pinMode(AnalogMinus, INPUT);
   pinMode(PumpenSoftwarePWM, OUTPUT);
-  pinMode(GasHahn, OUTPUT);
+  //pinMode(GasHahn, OUTPUT);
+  
+  ledcAttachPin(GasHahn, GasHahnChannel);  
+  ledcSetup(GasHahnChannel, 12000, 8); // 12 kHz PWM, 8-bit resolution
+
   pinMode(ZuendPin, OUTPUT);
   digitalWrite(GasHahn, 0);
 
