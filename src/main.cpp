@@ -24,6 +24,7 @@ const int i2cSCL = 22; //not in code because this are esp32 adruino wire.cpp def
 int BurningCheckDO = 32;
 int BurningCheckCS = 5;
 int BurningCheckCLK = 33;
+int ButtonOnLed = 37; //check this!
 
 //PININ
 const int UrinSensorInteruptPin = 27;
@@ -375,6 +376,7 @@ void ButtonCheck()
       --UrinPumpStufe;
 
     OnButton = digitalRead(OnButtonPin);
+    digitalWrite(ButtonOnLed, OnButton);
 
     char str[17];
     sprintf(str, "Fluidlevel  %d %%", ((UrinPumpStufe *100) / UrinPumpStufeMax));
@@ -394,6 +396,7 @@ void setup()
   pinMode(PlusButton, INPUT);
   pinMode(MinusButton, INPUT);
   pinMode(OnButtonPin, INPUT);
+  pinMode(ButtonOnLed, OUTPUT);
   //pinMode(PumpenSoftwarePWM, OUTPUT);
   //pinMode(GasHahn, OUTPUT);
   
