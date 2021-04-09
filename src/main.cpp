@@ -27,9 +27,9 @@ int BurningCheckCLK = 33;
 
 //PININ
 const int UrinSensorInteruptPin = 27;
-const int TempSensor = 33;
-const int AnalogPlus = 34;  //Pulldown 10K
-const int AnalogMinus = 35; //Pulldown 10K
+const int PlusButton = 34;  //Pulldown 10K
+const int MinusButton = 35; //Pulldown 10K
+const int OnButtonPin = 36; //Pulldown 10K
 
 unsigned long ZuendZeitpunkt = 0; //0: Kein Zündvorgang
 volatile unsigned long UrinSensorHeartbeat = 0;
@@ -56,6 +56,7 @@ int UrinPumpStufe = 0;
 const int UrinPumpStufeMax = 10;
 //const int GasMengeMin = 600;
 bool GasHahnAuf = false;
+bool OnButton = false;
 
 int ErrorState = 0; //1: UrinLow; 2: GasLow; 4: Zuenden erfolglos
 
@@ -239,7 +240,7 @@ void UrinPWM()
     if (TempIst < TempMin)
       UrinPumpStufe = 0;
 
-    if(UrinPumpStufe == 0)
+    if(UrinPumpStufe == 0 || !OnButton)
     {
       ledcWrite(PumpenChannel, 0);
       return;
@@ -356,7 +357,7 @@ void GasKontrolle()
   Line2 = "flame extinct";
 }
 
-void CheckPlusAnalogMinus()
+void ButtonCheck()
 {
   const unsigned long waitTime = 300;
   static unsigned long oldTime = 0;
@@ -364,17 +365,19 @@ void CheckPlusAnalogMinus()
   if (BinIchDran(waitTime, &oldTime))
   {
 
-    if (digitalRead(AnalogPlus) & (UrinPumpStufe < UrinPumpStufeMax) & (TempIst >= TempMin))
+    if (digitalRead(PlusButton) & (UrinPumpStufe < UrinPumpStufeMax) & (TempIst >= TempMin))
     {
       ++UrinPumpStufe;
       UrinSensorHeartbeat = millis();
     }
 
-    if (digitalRead(AnalogMinus) & (UrinPumpStufe > 0))
+    if (digitalRead(MinusButton) & (UrinPumpStufe > 0))
       --UrinPumpStufe;
 
+    OnButton = digitalRead(OnButtonPin);
+
     char str[17];
-    sprintf(str, "Fluidlevel  %d %", ((UrinPumpStufe *100) / UrinPumpStufeMax));
+    sprintf(str, "Fluidlevel  %d %%", ((UrinPumpStufe *100) / UrinPumpStufeMax));
     Line1 = str;
 
     //DEBUG_PRINTLN_VALUE("URIN - PumpStufe: ", UrinPumpStufe);
@@ -388,8 +391,9 @@ void setup()
 
   DEBUG_INIT(115200); // Initialisierung der seriellen Schnittstelle
 
-  pinMode(AnalogPlus, INPUT);
-  pinMode(AnalogMinus, INPUT);
+  pinMode(PlusButton, INPUT);
+  pinMode(MinusButton, INPUT);
+  pinMode(OnButtonPin, INPUT);
   //pinMode(PumpenSoftwarePWM, OUTPUT);
   //pinMode(GasHahn, OUTPUT);
   
@@ -421,7 +425,7 @@ void loop()
     TemperaturSteuerung();
     Zuendkontrolle();
     GasKontrolle();
-    CheckPlusAnalogMinus();
+    ButtonCheck();
   }
   else
   {
