@@ -24,13 +24,13 @@ const int i2cSCL = 22; //not in code because this are esp32 adruino wire.cpp def
 int BurningCheckDO = 32;
 int BurningCheckCS = 5;
 int BurningCheckCLK = 33;
-int ButtonOnLed = 37; //check this!
+int ButtonOnLed = 19; //check this!
 
 //PININ
 const int UrinSensorInteruptPin = 27;
 const int PlusButton = 34;  //Pulldown 10K
 const int MinusButton = 35; //Pulldown 10K
-const int OnButtonPin = 36; //Pulldown 10K
+const int OnButtonPin = 25; //Pulldown 10K
 
 unsigned long ZuendZeitpunkt = 0; //0: Kein Zündvorgang
 volatile unsigned long UrinSensorHeartbeat = 0;
@@ -39,7 +39,7 @@ int TempIst = 0;
 const unsigned long MaxZuendZeit = 10000;
 
 const int GasHahnChannel = 1;
-const int PumpenChannel = 1;
+const int PumpenChannel = 2;
 
 //Die ideale Tempereratur liegt zwischen TempMin und TempMax
 //Bei TempError wird die Maschine wegen Überhitzung gestoppt
@@ -51,7 +51,7 @@ const int PumpenChannel = 1;
 int TempMin = 240;
 int TempIdeal = 260;
 int TempMax = 280;
-const int TempError = 300;
+const int TempError = 330;
 
 int UrinPumpStufe = 0;
 const int UrinPumpStufeMax = 10;
@@ -89,13 +89,16 @@ bool BinIchDran(unsigned long waitTime, unsigned long *p_oldTime)
   return false;
 }
 
-void Display()
+void Display(bool force)
 {
   const unsigned long waitTime = 500; // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
   static unsigned long oldTime = 0;
 
-  if (!BinIchDran(waitTime, &oldTime)) //if time too short return last return
-    return;
+  if(!force)
+  {
+    if (!BinIchDran(waitTime, &oldTime)) //if time too short return last return
+      return;
+  }
 
   static String lastDisplay = "";   //Display is so slow it slows down SW PWM Pumpe!
   if(lastDisplay.compareTo(Line1 + Line2) == 0)
@@ -144,7 +147,7 @@ void Zuenden()
     return;
 
   DEBUG_PRINTLN("Zuenden.");
-  GasHahnSchalten(150 / 255);
+  GasHahnSchalten(210);
   DEBUG_PRINTLN("Gashahn ist offen");
 
   digitalWrite(ZuendPin, 1);
@@ -187,7 +190,10 @@ void ErrorAction()
 
   GasHahnSchalten(0);
   digitalWrite(ZuendPin, 0);
-  UrinPumpStufe = 0;
+  digitalWrite(ButtonOnLed, 0);
+  ledcWrite(PumpenChannel, 0);
+
+  delay(1000);
 }
 
 #ifdef _SMARTDEBUG
@@ -272,7 +278,7 @@ void UrinRunningCheck()
 
   if (BinIchDran(waitTime, &oldTime))
   {
-    if (UrinPumpStufe == 0)
+    if (UrinPumpStufe == 0 || !OnButton)
       return;
 
     if (millis() - UrinSensorHeartbeat > 5000)
@@ -417,10 +423,9 @@ void setup()
 
 void loop()
 {
-  Display();
-
   if (ErrorState == 0)
   {
+    Display(false);
     ReadTemp();
     UrinPWM();
     UrinRunningCheck();
@@ -433,5 +438,6 @@ void loop()
   else
   {
     ErrorAction();
+    Display(true);
   }
 }
