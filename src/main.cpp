@@ -28,9 +28,9 @@ int ButtonOnLed = 19; //check this!
 
 //PININ
 const int UrinSensorInteruptPin = 27;
-const int PlusButton = 34;  //Pulldown 10K
-const int MinusButton = 35; //Pulldown 10K
-const int OnButtonPin = 25; //Pulldown 10K
+const int PlusButton = 34;
+const int MinusButton = 35;
+const int OnButtonPin = 25;
 
 unsigned long ZuendZeitpunkt = 0; //0: Kein Zündvorgang
 volatile unsigned long UrinSensorHeartbeat = 0;
@@ -75,7 +75,7 @@ void InteruptUrinSensor()
 
 bool BinIchDran(unsigned long waitTime, unsigned long *p_oldTime)
 {
-  if(ErrorState != 0)
+  if (ErrorState != 0)
     return false;
 
   unsigned long millisecs = millis();
@@ -94,16 +94,16 @@ void Display(bool force)
   const unsigned long waitTime = 500; // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
   static unsigned long oldTime = 0;
 
-  if(!force)
+  if (!force)
   {
     if (!BinIchDran(waitTime, &oldTime)) //if time too short return last return
       return;
   }
 
-  static String lastDisplay = "";   //Display is so slow it slows down SW PWM Pumpe!
-  if(lastDisplay.compareTo(Line1 + Line2) == 0)
+  static String lastDisplay = ""; //Display is so slow it slows down SW PWM Pumpe!
+  if (lastDisplay.compareTo(Line1 + Line2) == 0)
     return;
-  
+
   lastDisplay = Line1 + Line2;
 
   lcd.clear();
@@ -112,7 +112,6 @@ void Display(bool force)
   lcd.setCursor(0, 1);
   lcd.print(Line2);
 }
-
 
 inline boolean IsBurning()
 {
@@ -137,13 +136,13 @@ inline boolean IsBurning()
 
 void GasHahnSchalten(int value)
 {
-  ledcWrite(GasHahnChannel, value);  //this is an analogWrite
+  ledcWrite(GasHahnChannel, value); //this is an analogWrite
   GasHahnAuf = (value != 0);
 }
 
 void Zuenden()
 {
-  if(ZuendZeitpunkt > 0)
+  if (ZuendZeitpunkt > 0)
     return;
 
   DEBUG_PRINTLN("Zuenden.");
@@ -247,22 +246,22 @@ void UrinPWM()
     if (TempIst < TempMin)
       UrinPumpStufe = 0;
 
-    if(UrinPumpStufe == 0 || !OnButton)
+    if (UrinPumpStufe == 0 || !OnButton)
     {
       ledcWrite(PumpenChannel, 0);
       return;
     }
 
     static int lastValue = 0;
-    if(lastValue == UrinPumpStufe)
+    if (lastValue == UrinPumpStufe)
       return;
-    
+
     lastValue = UrinPumpStufe;
 
     const int pwmResolution = 8;
     //PumpStufeMax = 50 Hz
-    int frequenz =  (50 * UrinPumpStufe) / UrinPumpStufeMax;
-    ledcSetup(PumpenChannel, frequenz, pwmResolution);  //8 Bit = 255
+    int frequenz = (50 * UrinPumpStufe) / UrinPumpStufeMax;
+    ledcSetup(PumpenChannel, frequenz, pwmResolution); //8 Bit = 255
     //Bei der Frequenz will ich 10ms Impuls
     //Phasendauer = 1000ms / Herz, eg 30ms: Dann will ich 10ms Impuls von 30ms = 0,33 von Resolution = 255
 
@@ -296,9 +295,9 @@ void ReadTemp()
 
   if (BinIchDran(waitTime, &oldTime))
   {
-    const float RREF = 4300.0; //pt100 <-> pt 1000
+    const float RREF = 4300.0;                               //pt100 <-> pt 1000
     TempIst = (int)TemperaturSensor.temperature(1000, RREF); //1000 == Ohm bei 0Grad
-    //WriteFault(); 
+    //WriteFault();
 
     //DEBUG_PRINTLN_VALUE("TEMP Ist: ", TempIst);
   }
@@ -356,7 +355,7 @@ void GasKontrolle()
   if (ZuendZeitpunkt != 0) //zuending hat seine eigene Kontrolle
     return;
 
-  if(!GasHahnAuf || IsBurning())
+  if (!GasHahnAuf || IsBurning())
     return;
 
   DEBUG_PRINTLN("Gas auf ohne Flamme");
@@ -381,11 +380,15 @@ void ButtonCheck()
     if (digitalRead(MinusButton) & (UrinPumpStufe > 0))
       --UrinPumpStufe;
 
-    OnButton = digitalRead(OnButtonPin);
-    digitalWrite(ButtonOnLed, OnButton);
+    if (OnButton != digitalRead(OnButtonPin))
+    {
+      OnButton = !OnButton;
+      digitalWrite(ButtonOnLed, OnButton);
+      UrinSensorHeartbeat = millis(); //reset Urinsensor 2 give time for new running detect
+    }
 
     char str[17];
-    sprintf(str, "Fluidlevel  %d %%", ((UrinPumpStufe *100) / UrinPumpStufeMax));
+    sprintf(str, "Fluidlevel  %d %%", ((UrinPumpStufe * 100) / UrinPumpStufeMax));
     Line1 = str;
 
     //DEBUG_PRINTLN_VALUE("URIN - PumpStufe: ", UrinPumpStufe);
@@ -399,17 +402,17 @@ void setup()
 
   DEBUG_INIT(115200); // Initialisierung der seriellen Schnittstelle
 
-  pinMode(PlusButton, INPUT);
-  pinMode(MinusButton, INPUT);
-  pinMode(OnButtonPin, INPUT);
+  pinMode(PlusButton, INPUT_PULLDOWN);
+  pinMode(MinusButton, INPUT_PULLDOWN);
+  pinMode(OnButtonPin, INPUT_PULLDOWN);
   pinMode(ButtonOnLed, OUTPUT);
   //pinMode(PumpenSoftwarePWM, OUTPUT);
   //pinMode(GasHahn, OUTPUT);
-  
-  ledcAttachPin(GasHahn, GasHahnChannel);  
-  ledcAttachPin(PumpenPWM, PumpenChannel);  
+
+  ledcAttachPin(GasHahn, GasHahnChannel);
+  ledcAttachPin(PumpenPWM, PumpenChannel);
   ledcSetup(GasHahnChannel, 12000, 8); // 12 kHz PWM, 8-bit resolution
-  ledcSetup(PumpenChannel, 12000, 8); // Just a default!
+  ledcSetup(PumpenChannel, 12000, 8);  // Just a default!
 
   pinMode(ZuendPin, OUTPUT);
   digitalWrite(GasHahn, 0);
