@@ -117,7 +117,7 @@ inline boolean IsBurning()
 {
   static bool result = false;
 
-  const unsigned long waitTime = 300; // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
+  const unsigned long waitTime = 500; // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
   static unsigned long oldTime = 0;
 
   if (!BinIchDran(waitTime, &oldTime)) //if time too short return last return
@@ -388,7 +388,7 @@ void ButtonCheck()
     }
 
     char str[17];
-    sprintf(str, "Fluidlevel  %d %%", ((UrinPumpStufe * 100) / UrinPumpStufeMax));
+    sprintf(str, "Fluidlevel %d %%", ((UrinPumpStufe * 100) / UrinPumpStufeMax));
     Line1 = str;
 
     //DEBUG_PRINTLN_VALUE("URIN - PumpStufe: ", UrinPumpStufe);
