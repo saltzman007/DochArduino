@@ -24,12 +24,13 @@ const int i2cSCL = 22; //not in code because this are esp32 adruino wire.cpp def
 int BurningCheckDO = 32;
 int BurningCheckCS = 5;
 int BurningCheckCLK = 33;
+int ButtonOnLed = 19; //check this!
 
 //PININ
 const int UrinSensorInteruptPin = 27;
-const int TempSensor = 33;
-const int AnalogPlus = 34;  //Pulldown 10K
-const int AnalogMinus = 35; //Pulldown 10K
+const int PlusButton = 34;
+const int MinusButton = 35;
+const int OnButtonPin = 25;
 
 unsigned long ZuendZeitpunkt = 0; //0: Kein Zündvorgang
 volatile unsigned long UrinSensorHeartbeat = 0;
@@ -39,7 +40,6 @@ const unsigned long MaxZuendZeit = 10000;
 
 const int GasHahnChannel = 1;
 const int PumpenChannel = 2;
-
 
 //Die ideale Tempereratur liegt zwischen TempMin und TempMax
 //Bei TempError wird die Maschine wegen Überhitzung gestoppt
@@ -51,12 +51,13 @@ const int PumpenChannel = 2;
 int TempMin = 240;
 int TempIdeal = 270;
 int TempMax = 280;
-const int TempError = 310;
+const int TempError = 330;
 
 int UrinPumpStufe = 0;
 const int UrinPumpStufeMax = 10;
 //const int GasMengeMin = 600;
 bool GasHahnAuf = false;
+bool OnButton = false;
 
 int ErrorState = 0; //1: UrinLow; 2: GasLow; 4: Zuenden erfolglos
 
@@ -74,7 +75,7 @@ void InteruptUrinSensor()
 
 bool BinIchDran(unsigned long waitTime, unsigned long *p_oldTime)
 {
-  if(ErrorState != 0)
+  if (ErrorState != 0)
     return false;
 
   unsigned long millisecs = millis();
@@ -88,18 +89,21 @@ bool BinIchDran(unsigned long waitTime, unsigned long *p_oldTime)
   return false;
 }
 
-void Display()
+void Display(bool force)
 {
   const unsigned long waitTime = 500; // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
   static unsigned long oldTime = 0;
 
-  if (!BinIchDran(waitTime, &oldTime)) //if time too short return last return
+  if (!force)
+  {
+    if (!BinIchDran(waitTime, &oldTime)) //if time too short return last return
+      return;
+  }
+
+  static String lastDisplay = ""; //Display is so slow it slows down SW PWM Pumpe!
+  if (lastDisplay.compareTo(Line1 + Line2) == 0)
     return;
 
-  static String lastDisplay = "";   //Display is so slow it slows down SW PWM Pumpe!
-  if(lastDisplay.compareTo(Line1 + Line2) == 0)
-    return;
-  
   lastDisplay = Line1 + Line2;
 
   lcd.clear();
@@ -109,12 +113,11 @@ void Display()
   lcd.print(Line2);
 }
 
-
 inline boolean IsBurning()
 {
   static bool result = false;
 
-  const unsigned long waitTime = 300; // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
+  const unsigned long waitTime = 500; // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
   static unsigned long oldTime = 0;
 
   if (!BinIchDran(waitTime, &oldTime)) //if time too short return last return
@@ -133,26 +136,18 @@ inline boolean IsBurning()
 
 void GasHahnSchalten(int value)
 {
-  ledcWrite(GasHahnChannel, value);  //this is an analogWrite
+  ledcWrite(GasHahnChannel, value); //this is an analogWrite
   GasHahnAuf = (value != 0);
 }
 
 void Zuenden()
 {
-  static int proportionalVentilStellung;
+  if (ZuendZeitpunkt > 0)
+    return;
 
-  if(ZuendZeitpunkt > 0)  //Ist schon am Zünden
-  {
-      if(proportionalVentilStellung < 250)
-        proportionalVentilStellung += 3;
-  }
-  else
-  {
-    proportionalVentilStellung = 220;
-    digitalWrite(ZuendPin, 1);
-    ZuendZeitpunkt = millis();
-    DEBUG_PRINTLN("Zuenden.");
-  }
+  DEBUG_PRINTLN("Zuenden.");
+  GasHahnSchalten(210);
+  DEBUG_PRINTLN("Gashahn ist offen");
 
   GasHahnSchalten(proportionalVentilStellung);
   DEBUG_PRINTLN_VALUE("Gashahn ist offen", proportionalVentilStellung);
@@ -200,9 +195,10 @@ void ErrorAction()
 
   GasHahnSchalten(0);
   digitalWrite(ZuendPin, 0);
-  UrinPumpStufe = 0;
+  digitalWrite(ButtonOnLed, 0);
+  ledcWrite(PumpenChannel, 0);
 
-  PumpeAus();
+  delay(1000);
 }
 
 #ifdef _SMARTDEBUG
@@ -256,23 +252,23 @@ void UrinPWM()
     if (TempIst < TempMin)
       UrinPumpStufe = 0;
 
-    if(UrinPumpStufe == 0)
+    if (UrinPumpStufe == 0 || !OnButton)
     {
-      PumpeAus();
+      ledcWrite(PumpenChannel, 0);
       return;
     }
 
     static int lastValue = 0;
-    if(lastValue == UrinPumpStufe)
+    if (lastValue == UrinPumpStufe)
       return;
-    
+
     lastValue = UrinPumpStufe;
 
     const int pwmResolution = 8;
     //PumpStufeMax = 50 Hz
-    int frequenz =  (50 * UrinPumpStufe) / UrinPumpStufeMax;
-    ledcSetup(PumpenChannel, frequenz, pwmResolution);  //8 Bit = 255
-    ledcAttachPin(PumpenPWM, PumpenChannel);    //Bei der Frequenz will ich 10ms Impuls
+    int frequenz = (50 * UrinPumpStufe) / UrinPumpStufeMax;
+    ledcSetup(PumpenChannel, frequenz, pwmResolution); //8 Bit = 255
+    //Bei der Frequenz will ich 10ms Impuls
     //Phasendauer = 1000ms / Herz, eg 30ms: Dann will ich 10ms Impuls von 30ms = 0,33 von Resolution = 255
 
     //ledcWrite(PumpenChannel, 10 * 255 / (1000 / frequenz)); //too big, circa 2,5 * frequenz
@@ -287,7 +283,7 @@ void UrinRunningCheck()
 
   if (BinIchDran(waitTime, &oldTime))
   {
-    if (UrinPumpStufe == 0)
+    if (UrinPumpStufe == 0 || !OnButton)
       return;
 
     if (millis() - UrinSensorHeartbeat > 5000)
@@ -305,9 +301,9 @@ void ReadTemp()
 
   if (BinIchDran(waitTime, &oldTime))
   {
-    const float RREF = 4300.0; //pt100 <-> pt 1000
+    const float RREF = 4300.0;                               //pt100 <-> pt 1000
     TempIst = (int)TemperaturSensor.temperature(1000, RREF); //1000 == Ohm bei 0Grad
-    //WriteFault(); 
+    //WriteFault();
 
     DEBUG_PRINTLN_VALUE("TEMP Ist: ", TempIst);
   }
@@ -365,7 +361,7 @@ void GasKontrolle()
   if (ZuendZeitpunkt != 0) //zuending hat seine eigene Kontrolle
     return;
 
-  if(!GasHahnAuf || IsBurning())
+  if (!GasHahnAuf || IsBurning())
     return;
 
   DEBUG_PRINTLN("Gas auf ohne Flamme");
@@ -373,7 +369,7 @@ void GasKontrolle()
   Line2 = "flame extinct";
 }
 
-void CheckPlusAnalogMinus()
+void ButtonCheck()
 {
   const unsigned long waitTime = 300;
   static unsigned long oldTime = 0;
@@ -381,17 +377,24 @@ void CheckPlusAnalogMinus()
   if (BinIchDran(waitTime, &oldTime))
   {
 
-    if (digitalRead(AnalogPlus) & (UrinPumpStufe < UrinPumpStufeMax) & (TempIst >= TempMin))
+    if (digitalRead(PlusButton) & (UrinPumpStufe < UrinPumpStufeMax) & (TempIst >= TempMin))
     {
       ++UrinPumpStufe;
       UrinSensorHeartbeat = millis();
     }
 
-    if (digitalRead(AnalogMinus) & (UrinPumpStufe > 0))
+    if (digitalRead(MinusButton) & (UrinPumpStufe > 0))
       --UrinPumpStufe;
 
+    if (OnButton != digitalRead(OnButtonPin))
+    {
+      OnButton = !OnButton;
+      digitalWrite(ButtonOnLed, OnButton);
+      UrinSensorHeartbeat = millis(); //reset Urinsensor 2 give time for new running detect
+    }
+
     char str[17];
-    sprintf(str, "Fluidlevel %d %%", ((UrinPumpStufe *100) / UrinPumpStufeMax));
+    sprintf(str, "Fluidlevel %d %%", ((UrinPumpStufe * 100) / UrinPumpStufeMax));
     Line1 = str;
 
     //DEBUG_PRINTLN_VALUE("URIN - PumpStufe: ", UrinPumpStufe);
@@ -405,13 +408,17 @@ void setup()
 
   DEBUG_INIT(115200); // Initialisierung der seriellen Schnittstelle
 
-  pinMode(AnalogPlus, INPUT);
-  pinMode(AnalogMinus, INPUT);
+  pinMode(PlusButton, INPUT_PULLDOWN);
+  pinMode(MinusButton, INPUT_PULLDOWN);
+  pinMode(OnButtonPin, INPUT_PULLDOWN);
+  pinMode(ButtonOnLed, OUTPUT);
   //pinMode(PumpenSoftwarePWM, OUTPUT);
   //pinMode(GasHahn, OUTPUT);
-  
-  ledcSetup(GasHahnChannel, 5000, 8); // 12 kHz PWM, 8-bit resolution
-  ledcAttachPin(GasHahn, GasHahnChannel);  
+
+  ledcAttachPin(GasHahn, GasHahnChannel);
+  ledcAttachPin(PumpenPWM, PumpenChannel);
+  ledcSetup(GasHahnChannel, 12000, 8); // 12 kHz PWM, 8-bit resolution
+  ledcSetup(PumpenChannel, 12000, 8);  // Just a default!
 
   pinMode(ZuendPin, OUTPUT);
   ledcWrite(GasHahnChannel, 0);
@@ -425,10 +432,9 @@ void setup()
 
 void loop()
 {
-  Display();
-
   if (ErrorState == 0)
   {
+    Display(false);
     ReadTemp();
     UrinPWM();
     UrinRunningCheck();
@@ -436,10 +442,11 @@ void loop()
     TemperaturSteuerung();
     Zuendkontrolle();
     GasKontrolle();
-    CheckPlusAnalogMinus();
+    ButtonCheck();
   }
   else
   {
     ErrorAction();
+    Display(true);
   }
 }
