@@ -49,7 +49,7 @@ const int PumpenChannel = 2;
 //Ab TempMin kann genebelt werden
 
 int TempMin = 240;
-int TempIdeal = 270;
+int TempIdeal = 260;
 int TempMax = 280;
 const int TempError = 330;
 
@@ -124,7 +124,7 @@ inline boolean IsBurning()
     return result;
 
   int temp = (int)Flammdetektor.readCelsius();
-  DEBUG_PRINTLN_VALUE("Flammdetektor: ", temp);
+  //DEBUG_PRINTLN_VALUE("Flammdetektor: ", temp);
 
   if (temp > 100)
     result = true;
@@ -149,9 +149,10 @@ void Zuenden()
   GasHahnSchalten(210);
   DEBUG_PRINTLN("Gashahn ist offen");
 
-  GasHahnSchalten(proportionalVentilStellung);
-  DEBUG_PRINTLN_VALUE("Gashahn ist offen", proportionalVentilStellung);
+  digitalWrite(ZuendPin, 1);
+  ZuendZeitpunkt = millis();
 }
+
 void Zuendkontrolle()
 {
   const unsigned long waitTime = 500;
@@ -179,13 +180,6 @@ void Zuendkontrolle()
   ErrorState = 4;
 
   Line2 = "no ignition";
-}
-
-void PumpeAus()
-{
-      ledcSetup(PumpenChannel, 1000, 8);  //8 Bit = 255
-      ledcAttachPin(PumpenPWM, PumpenChannel);   
-      ledcWrite(PumpenChannel, 0);
 }
 
 void ErrorAction()
@@ -305,7 +299,7 @@ void ReadTemp()
     TempIst = (int)TemperaturSensor.temperature(1000, RREF); //1000 == Ohm bei 0Grad
     //WriteFault();
 
-    DEBUG_PRINTLN_VALUE("TEMP Ist: ", TempIst);
+    //DEBUG_PRINTLN_VALUE("TEMP Ist: ", TempIst);
   }
 }
 
@@ -421,7 +415,7 @@ void setup()
   ledcSetup(PumpenChannel, 12000, 8);  // Just a default!
 
   pinMode(ZuendPin, OUTPUT);
-  ledcWrite(GasHahnChannel, 0);
+  digitalWrite(GasHahn, 0);
 
   pinMode(UrinSensorInteruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(UrinSensorInteruptPin), InteruptUrinSensor, FALLING);
