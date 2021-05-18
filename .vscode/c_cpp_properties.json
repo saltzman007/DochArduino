@@ -10,6 +10,7 @@
             "includePath": [
                 "/home/pi/Documents/PlatformIO/Projects/DochArduino/include",
                 "/home/pi/Documents/PlatformIO/Projects/DochArduino/src",
+                "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                 "/home/pi/Documents/PlatformIO/Projects/DochArduino/lib/MAX6675/src",
                 "/home/pi/Documents/PlatformIO/Projects/DochArduino/.pio/libdeps/esp32dev/Adafruit MAX31865 library",
                 "/home/pi/Documents/PlatformIO/Projects/DochArduino/.pio/libdeps/esp32dev/Adafruit BusIO",
@@ -102,7 +103,6 @@
                 "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/Ticker/src",
                 "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/Update/src",
                 "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
-                "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                 "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                 "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
                 "/home/pi/.platformio/packages/tool-unity",
@@ -113,6 +113,7 @@
                 "path": [
                     "/home/pi/Documents/PlatformIO/Projects/DochArduino/include",
                     "/home/pi/Documents/PlatformIO/Projects/DochArduino/src",
+                    "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                     "/home/pi/Documents/PlatformIO/Projects/DochArduino/lib/MAX6675/src",
                     "/home/pi/Documents/PlatformIO/Projects/DochArduino/.pio/libdeps/esp32dev/Adafruit MAX31865 library",
                     "/home/pi/Documents/PlatformIO/Projects/DochArduino/.pio/libdeps/esp32dev/Adafruit BusIO",
@@ -205,7 +206,6 @@
                     "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/Ticker/src",
                     "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/Update/src",
                     "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
-                    "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                     "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                     "/home/pi/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
                     "/home/pi/.platformio/packages/tool-unity",

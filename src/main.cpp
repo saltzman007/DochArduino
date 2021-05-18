@@ -8,6 +8,15 @@
 #include "MAX6675.h"
 #include "Adafruit_MAX31865.h"
 
+#define LOGGING
+
+#ifdef LOGGING
+#include <WiFi.h>
+#include <../../../../network.h>
+//const char *ssid = "";         //  your network SSID (name)
+//const char *password = ""; // your network password
+#endif
+
 //PINOUT
 //dont use 1 2 and serial!!
 
@@ -73,10 +82,13 @@ void InteruptUrinSensor()
   UrinSensorHeartbeat = millis();
 }
 
-bool BinIchDran(unsigned long waitTime, unsigned long *p_oldTime)
+bool BinIchDran(unsigned long waitTime, unsigned long *p_oldTime, bool ExecuteOnError = false)
 {
-  if (ErrorState != 0)
-    return false;
+  if (!ExecuteOnError)
+  {
+    if (ErrorState != 0)
+      return false;
+  }
 
   unsigned long millisecs = millis();
 
@@ -94,11 +106,8 @@ void Display(bool force)
   const unsigned long waitTime = 500; // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
   static unsigned long oldTime = 0;
 
-  if (!force)
-  {
-    if (!BinIchDran(waitTime, &oldTime)) //if time too short return last return
-      return;
-  }
+  if (!BinIchDran(waitTime, &oldTime, force)) //if time too short return last return
+    return;
 
   static String lastDisplay = ""; //Display is so slow it slows down SW PWM Pumpe!
   if (lastDisplay.compareTo(Line1 + Line2) == 0)
@@ -180,19 +189,6 @@ void Zuendkontrolle()
   ErrorState = 4;
 
   Line2 = "no ignition";
-}
-
-void ErrorAction()
-{
-  Line1 = "Error";
-  DEBUG_PRINTLN_VALUE("Errorstate: ", ErrorState);
-
-  GasHahnSchalten(0);
-  digitalWrite(ZuendPin, 0);
-  digitalWrite(ButtonOnLed, 0);
-  ledcWrite(PumpenChannel, 0);
-
-  delay(1000);
 }
 
 #ifdef _SMARTDEBUG
@@ -395,6 +391,65 @@ void ButtonCheck()
   }
 }
 
+#ifdef LOGGING
+int status = WL_IDLE_STATUS; // the Wifi radio's status
+
+//byte host[] = {192, 168, 178, 26};  //TODO get this dynamic
+int port = 8089;
+WiFiUDP udp;
+
+void initWiFi()
+{
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  DEBUG_PRINTLN("Connecting to WiFi ..");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    Serial.print('.');
+    delay(1000);
+  }
+  DEBUG_PRINTLN(WiFi.localIP());
+}
+
+void sendUdp(String msg)
+{
+
+  DEBUG_PRINTLN("Sending UDP packet: " + msg);
+
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    WiFi.disconnect();
+    initWiFi();
+  }
+
+  //udp.beginPacket(host, port);
+  udp.beginPacket("raspberrypi", port);
+  udp.print(msg);
+  udp.endPacket();
+}
+void SendLoggingUdp()
+{
+  const unsigned long waitTime = 1111;
+  static unsigned long oldTime = 0;
+
+  if (!BinIchDran(waitTime, &oldTime, true))
+    return;
+
+  String schalter = OnButton ? "0" : "1";
+  String fire = IsBurning() ? "0" : "1";
+
+  String line = String("temperature Pumpstufe=") + String(UrinPumpStufe) +
+                ",Led1=\"" + Line1 + "\",Led2=\"" + Line2 +
+                "\",Schalter=" + schalter +
+                ",ErrorStatus=" + String(ErrorState) +
+                ",Fire=" + fire +
+                ",value=" + String(TempIst);
+
+  sendUdp(line);
+}
+
+#endif
+
 void setup()
 {
   lcd.init();
@@ -421,7 +476,28 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(UrinSensorInteruptPin), InteruptUrinSensor, FALLING);
   TemperaturSensor.begin(MAX31865_2WIRE);
 
+#ifdef LOGGING
+  initWiFi();
+#endif
+
   DEBUG_PRINTLN("Setup finished.");
+}
+
+void ErrorAction()
+{
+  Line1 = "Error";
+  DEBUG_PRINTLN_VALUE("Errorstate: ", ErrorState);
+
+  GasHahnSchalten(0);
+  digitalWrite(ZuendPin, 0);
+  digitalWrite(ButtonOnLed, 0);
+  ledcWrite(PumpenChannel, 0);
+
+#ifdef LOGGING
+  SendLoggingUdp();
+#endif
+
+  delay(1000);
 }
 
 void loop()
@@ -437,6 +513,9 @@ void loop()
     Zuendkontrolle();
     GasKontrolle();
     ButtonCheck();
+#ifdef LOGGING
+    SendLoggingUdp();
+#endif
   }
   else
   {
