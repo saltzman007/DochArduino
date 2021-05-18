@@ -155,7 +155,7 @@ void Zuenden()
     return;
 
   DEBUG_PRINTLN("Zuenden.");
-  GasHahnSchalten(210);
+  GasHahnSchalten(255);
   DEBUG_PRINTLN("Gashahn ist offen");
 
   digitalWrite(ZuendPin, 1);
@@ -242,14 +242,20 @@ void UrinPWM()
     if (TempIst < TempMin)
       UrinPumpStufe = 0;
 
+    static int lastValue = 0;
+    static bool lastOnButton = false;
+
     if (UrinPumpStufe == 0 || !OnButton)
     {
       ledcWrite(PumpenChannel, 0);
+      lastOnButton = OnButton;
       return;
     }
 
-    static int lastValue = 0;
-    if (lastValue == UrinPumpStufe)
+    bool onButtonChanged = lastOnButton != OnButton;
+    lastOnButton = true;
+
+    if ((lastValue == UrinPumpStufe) && !onButtonChanged)
       return;
 
     lastValue = UrinPumpStufe;
@@ -435,10 +441,10 @@ void SendLoggingUdp()
   if (!BinIchDran(waitTime, &oldTime, true))
     return;
 
-  String schalter = OnButton ? "0" : "1";
-  String fire = IsBurning() ? "0" : "1";
+  String schalter = OnButton ? "1" : "0";
+  String fire = IsBurning() ? "1" : "0";
 
-  String line = String("temperature Pumpstufe=") + String(UrinPumpStufe) +
+  String line = String("temperature Pumpstufe=") + String(UrinPumpStufe * 10) +
                 ",Led1=\"" + Line1 + "\",Led2=\"" + Line2 +
                 "\",Schalter=" + schalter +
                 ",ErrorStatus=" + String(ErrorState) +
