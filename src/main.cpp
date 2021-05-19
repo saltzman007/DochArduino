@@ -20,7 +20,8 @@
 //PINOUT
 //dont use 1 2 and serial!!
 
-const int GasHahn = 18;
+const int GasHahnBrennPin = 18;
+const int GasHahnZuendPin = 20;
 const int ZuendPin = 23;
 const int PumpenPWM = 26;
 
@@ -33,7 +34,7 @@ const int i2cSCL = 22; //not in code because this are esp32 adruino wire.cpp def
 int BurningCheckDO = 32;
 int BurningCheckCS = 5;
 int BurningCheckCLK = 33;
-int ButtonOnLed = 19; //check this!
+int ButtonOnLed = 19;
 
 //PININ
 const int UrinSensorInteruptPin = 27;
@@ -47,7 +48,6 @@ volatile unsigned long UrinSensorHeartbeat = 0;
 int TempIst = 0;
 const unsigned long MaxZuendZeit = 10000;
 
-const int GasHahnChannel = 1;
 const int PumpenChannel = 2;
 
 //Die ideale Tempereratur liegt zwischen TempMin und TempMax
@@ -64,7 +64,7 @@ const int TempError = 330;
 
 int UrinPumpStufe = 0;
 const int UrinPumpStufeMax = 10;
-//const int GasMengeMin = 600;
+
 bool GasHahnAuf = false;
 bool OnButton = false;
 
@@ -76,6 +76,13 @@ String Line2 = "Starting";
 
 MAX6675 Flammdetektor(BurningCheckCLK, BurningCheckCS, BurningCheckDO);
 Adafruit_MAX31865 TemperaturSensor = Adafruit_MAX31865(TempSpiCS, TempSpiDI, BurningCheckDO, BurningCheckCLK);
+
+enum HeizType
+{
+  HeizTypeOff = 0,
+  HeizTypeZuenden = 1,
+  HeizTypeBrennen = 2
+};
 
 void InteruptUrinSensor()
 {
@@ -143,10 +150,20 @@ inline boolean IsBurning()
   return result;
 }
 
-void GasHahnSchalten(int value)
+void GasHahnSchalten(HeizType heizType)
 {
-  ledcWrite(GasHahnChannel, value); //this is an analogWrite
-  GasHahnAuf = (value != 0);
+  static HeizType lastHeizType = HeizTypeOff;
+
+  digitalWrite(GasHahnBrennPin, heizType & HeizTypeBrennen);
+
+  if (lastHeizType == HeizTypeZuenden)
+    delay(100);
+
+  digitalWrite(GasHahnZuendPin, heizType & HeizTypeZuenden);
+
+  lastHeizType = heizType;
+
+  GasHahnAuf = (heizType != HeizTypeOff);
 }
 
 void Zuenden()
@@ -155,7 +172,7 @@ void Zuenden()
     return;
 
   DEBUG_PRINTLN("Zuenden.");
-  GasHahnSchalten(255);
+  GasHahnSchalten(HeizTypeZuenden);
   DEBUG_PRINTLN("Gashahn ist offen");
 
   digitalWrite(ZuendPin, 1);
@@ -177,7 +194,7 @@ void Zuendkontrolle()
   {
     DEBUG_PRINTLN("Burning ");
     digitalWrite(ZuendPin, 0);
-    GasHahnSchalten(255);
+    GasHahnSchalten(HeizTypeBrennen);
     ZuendZeitpunkt = 0;
     return;
   }
@@ -341,7 +358,7 @@ void TemperaturSteuerung()
 
     if (TempIst > TempMax)
     {
-      GasHahnSchalten(0);
+      GasHahnSchalten(HeizTypeOff);
     }
   }
 }
@@ -467,16 +484,15 @@ void setup()
   pinMode(MinusButton, INPUT_PULLDOWN);
   pinMode(OnButtonPin, INPUT_PULLDOWN);
   pinMode(ButtonOnLed, OUTPUT);
-  //pinMode(PumpenSoftwarePWM, OUTPUT);
-  //pinMode(GasHahn, OUTPUT);
+  pinMode(GasHahnBrennPin, OUTPUT);
+  pinMode(GasHahnZuendPin, OUTPUT);
 
-  ledcAttachPin(GasHahn, GasHahnChannel);
   ledcAttachPin(PumpenPWM, PumpenChannel);
-  ledcSetup(GasHahnChannel, 12000, 8); // 12 kHz PWM, 8-bit resolution
-  ledcSetup(PumpenChannel, 12000, 8);  // Just a default!
+  ledcSetup(PumpenChannel, 12000, 8); // Just a default!
 
   pinMode(ZuendPin, OUTPUT);
-  digitalWrite(GasHahn, 0);
+
+  GasHahnSchalten(HeizTypeOff);
 
   pinMode(UrinSensorInteruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(UrinSensorInteruptPin), InteruptUrinSensor, FALLING);
@@ -494,7 +510,7 @@ void ErrorAction()
   Line1 = "Error";
   DEBUG_PRINTLN_VALUE("Errorstate: ", ErrorState);
 
-  GasHahnSchalten(0);
+  GasHahnSchalten(HeizTypeOff);
   digitalWrite(ZuendPin, 0);
   digitalWrite(ButtonOnLed, 0);
   ledcWrite(PumpenChannel, 0);
