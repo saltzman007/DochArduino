@@ -21,7 +21,7 @@
 //dont use 1 2 and serial!!
 
 const int GasHahnBrennPin = 18;
-const int GasHahnZuendPin = 20;
+const int GasHahnZuendPin = 14;
 const int ZuendPin = 23;
 const int PumpenPWM = 26;
 
@@ -172,6 +172,8 @@ void Zuenden()
     return;
 
   DEBUG_PRINTLN("Zuenden.");
+  GasHahnSchalten(HeizTypeBrennen);
+  delay(300); //Brennschlauch mit Gas füllen
   GasHahnSchalten(HeizTypeZuenden);
   DEBUG_PRINTLN("Gashahn ist offen");
 
