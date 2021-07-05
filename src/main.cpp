@@ -21,7 +21,7 @@
 //dont use 1 2 and serial!!
 
 const int GasHahnBrennPin = 18;
-const int GasHahnZuendPin = 14;
+const int GasHahnZuendPin = 16;
 const int ZuendPin = 23;
 const int PumpenPWM = 26;
 
@@ -34,7 +34,6 @@ const int i2cSCL = 22; //not in code because this are esp32 adruino wire.cpp def
 int BurningCheckDO = 32;
 int BurningCheckCS = 5;
 int BurningCheckCLK = 33;
-int ButtonOnLed = 19;
 
 //PININ
 const int UrinSensorInteruptPin = 27;
@@ -57,8 +56,8 @@ const int PumpenChannel = 2;
 //Fallende TempIdeal: Es wird ab TempIdeal geheizt
 //Ab TempMin kann genebelt werden
 
-int TempMin = 240;
-int TempIdeal = 260;
+int TempMin = 230;
+int TempIdeal = 279;
 int TempMax = 280;
 const int TempError = 330;
 
@@ -152,16 +151,16 @@ inline boolean IsBurning()
 
 void GasHahnSchalten(HeizType heizType)
 {
-  static HeizType lastHeizType = HeizTypeOff;
+  //static HeizType lastHeizType = HeizTypeOff;
 
-  digitalWrite(GasHahnBrennPin, heizType & HeizTypeBrennen);
+  digitalWrite(GasHahnBrennPin, (heizType & HeizTypeBrennen));
 
-  if (lastHeizType == HeizTypeZuenden)
-    delay(100);
+  //if (lastHeizType == HeizTypeZuenden)
+  //  delay(100);
 
-  digitalWrite(GasHahnZuendPin, heizType & HeizTypeZuenden);
+  digitalWrite(GasHahnZuendPin, (heizType & HeizTypeZuenden));
 
-  lastHeizType = heizType;
+  //lastHeizType = heizType;
 
   GasHahnAuf = (heizType != HeizTypeOff);
 }
@@ -172,8 +171,9 @@ void Zuenden()
     return;
 
   DEBUG_PRINTLN("Zuenden.");
-  GasHahnSchalten(HeizTypeBrennen);
-  delay(300); //Brennschlauch mit Gas füllen
+  //GasHahnSchalten(HeizTypeBrennen);
+  //delay(300); //Brennschlauch mit Gas füllen
+  //GasHahnSchalten(HeizTypeOff);
   GasHahnSchalten(HeizTypeZuenden);
   DEBUG_PRINTLN("Gashahn ist offen");
 
@@ -281,7 +281,7 @@ void UrinPWM()
 
     const int pwmResolution = 8;
     //PumpStufeMax = 50 Hz
-    int frequenz = (50 * UrinPumpStufe) / UrinPumpStufeMax;
+    int frequenz = (12 * UrinPumpStufe) / UrinPumpStufeMax;
     ledcSetup(PumpenChannel, frequenz, pwmResolution); //8 Bit = 255
     //Bei der Frequenz will ich 10ms Impuls
     //Phasendauer = 1000ms / Herz, eg 30ms: Dann will ich 10ms Impuls von 30ms = 0,33 von Resolution = 255
@@ -404,7 +404,6 @@ void ButtonCheck()
     if (OnButton != digitalRead(OnButtonPin))
     {
       OnButton = !OnButton;
-      digitalWrite(ButtonOnLed, OnButton);
       UrinSensorHeartbeat = millis(); //reset Urinsensor 2 give time for new running detect
     }
 
@@ -461,7 +460,7 @@ void SendLoggingUdp()
     return;
 
   String schalter = OnButton ? "1" : "0";
-  String fire = IsBurning() ? "1" : "0";
+  String fire = GasHahnAuf ? "1" : "0";
 
   String line = String("temperature Pumpstufe=") + String(UrinPumpStufe * 10) +
                 ",Led1=\"" + Line1 + "\",Led2=\"" + Line2 +
@@ -485,7 +484,6 @@ void setup()
   pinMode(PlusButton, INPUT_PULLDOWN);
   pinMode(MinusButton, INPUT_PULLDOWN);
   pinMode(OnButtonPin, INPUT_PULLDOWN);
-  pinMode(ButtonOnLed, OUTPUT);
   pinMode(GasHahnBrennPin, OUTPUT);
   pinMode(GasHahnZuendPin, OUTPUT);
 
@@ -514,7 +512,6 @@ void ErrorAction()
 
   GasHahnSchalten(HeizTypeOff);
   digitalWrite(ZuendPin, 0);
-  digitalWrite(ButtonOnLed, 0);
   ledcWrite(PumpenChannel, 0);
 
 #ifdef LOGGING
